@@ -1,12 +1,3 @@
-/*!
- * Utility v!version!
- * http://code.google.com/p/utility-js/
- *
- * Developed by:
- * - Xotic750
- *
- * GPL version 3 or any later version; http://www.gnu.org/copyleft/gpl.html
- */
 
 /*jslint white: true, browser: true, devel: true, undef: true, nomen: true, bitwise: true, plusplus: true, immed: true, regexp: true, eqeqeq: true, newcap: true, strict: true, onevar: true, maxerr: 50, maxlen: 280, indent: 4 */
 /*global window,GM_getValue,GM_setValue,GM_deleteValue,GM_listValues,localStorage,sessionStorage,rison */
@@ -17,7 +8,7 @@
 // Small functions called a lot to reduce duplicate code
 /////////////////////////////////////////////////////////////////////
 
-(function () {
+(function (window) {
     "use strict";
 
     var log_version = '',
@@ -26,7 +17,7 @@
         RISON = {},
         owl = {},
         utility = {},
-        b64   = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=",
+        b64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=",
         cx = /[\u0000\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g,
         escapable = /[\\\"\x00-\x1f\x7f-\x9f\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g,
         gap,
@@ -1870,12 +1861,12 @@
     ///////////////////////////
 
     /** json.hpack
-     * @description JSON Homogeneous Collection Packer
-     * @version     1.0.1
-     * @author      Andrea Giammarchi
-     * @license     Mit Style License
-     * @project     http://github.com/WebReflection/json.hpack/tree/master
-     * @blog        http://webreflection.blogspot.com/
+     * description JSON Homogeneous Collection Packer
+     * version     1.0.1
+     * author      Andrea Giammarchi
+     * license     Mit Style License
+     * project     http://github.com/WebReflection/json.hpack/tree/master
+     * blog        http://webreflection.blogspot.com/
      */
 
     // @author  Andrea Giammarchi
@@ -2678,7 +2669,7 @@
     };
 
     RISON.parser.prototype.error = function (message) {
-        if (typeof console !== 'undefined') {
+        if (console && typeof console.log === 'function') {
             console.log('RISON parser error: ', message);
         }
 
@@ -3753,7 +3744,7 @@
                     l = 0;
 
                 type = type ? type : "log";
-                type = utility.isDefined(console[type]) ? type : (utility.isDefined(console.log) ? type : '');
+                type = console && typeof console[type] === 'function' ? type : (console && typeof console.log === 'function' ? "log" : '');
                 if (type) {
                     if (arguments.length === 4) {
                         for (i = 0, l = arguments[3].length; i < l; i += 1) {
@@ -4481,16 +4472,16 @@
                     return storage_id;
                 };
 
-                this['set_fireFoxUseGM'] = this.set_fireFoxUseGM = function (bool) {
-                    fireFoxUseGM = utility.isBoolean(bool) ? bool : false;
+                this['set_fireFoxUseGM'] = this.set_fireFoxUseGM = function (enable) {
+                    fireFoxUseGM = utility.isBoolean(enable) ? enable : false;
                 };
 
                 this['get_fireFoxUseGM'] = this.get_fireFoxUseGM = function () {
                     return fireFoxUseGM;
                 };
 
-                this['set_useRison'] = this.set_useRison = function (bool) {
-                    useRison = utility.isBoolean(bool) ? bool : true;
+                this['set_useRison'] = this.set_useRison = function (enable) {
+                    useRison = utility.isBoolean(enable) ? enable : true;
                 };
 
                 this['get_useRison'] = this.get_useRison = function () {
@@ -5051,4 +5042,4 @@
         window['utility'] = window.utility = window['$u'] = window.$u = utility;
     }
     /*jslint sub: false */
-}());
+}(window));
