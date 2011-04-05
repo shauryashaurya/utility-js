@@ -942,22 +942,23 @@
     };
 
     // Returns the SI value of a number
-    Number.prototype['SI'] = Number.prototype.SI = function () {
+    Number.prototype['SI'] = Number.prototype.SI = function (x) {
+        x = x >= 0 && x <= 20 ? x : 1;
         var a = Math.abs(this);
         if (a >= 1e12) {
-            return (this / 1e12).toFixed(1) + ' T';
+            return (this / 1e12).toFixed(x) + 'T';
         }
 
         if (a >= 1e9) {
-            return (this / 1e9).toFixed(1) + ' B';
+            return (this / 1e9).toFixed(x) + 'B';
         }
 
         if (a >= 1e6) {
-            return (this / 1e6).toFixed(1) + ' M';
+            return (this / 1e6).toFixed(x) + 'M';
         }
 
         if (a >= 1e3) {
-            return (this / 1e3).toFixed(1) + ' k';
+            return (this / 1e3).toFixed(x) + 'k';
         }
 
         return this;
