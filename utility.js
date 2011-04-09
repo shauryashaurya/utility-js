@@ -2670,7 +2670,7 @@
     };
 
     RISON.parser.prototype.error = function (message) {
-        if (console && typeof console.log === 'function') {
+        if (window.console && typeof console.log === 'function') {
             console.log('RISON parser error: ', message);
         }
 
@@ -3356,7 +3356,7 @@
                     l = 0;
 
                 type = type ? type : "log";
-                type = console && typeof console[type] === 'function' ? type : (console && typeof console.log === 'function' ? "log" : '');
+                type = window.console && typeof console[type] === 'function' ? type : (window.console && typeof console.log === 'function' ? "log" : '');
                 if (type) {
                     if (arguments.length === 4) {
                         for (i = 0, l = arguments[3].length; i < l; i += 1) {
