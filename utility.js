@@ -2971,9 +2971,13 @@
     utility = {
         version: "!version!",
 
-        is_chrome: navigator.userAgent.toLowerCase().hasIndexOf('chrome'),
+        is_chrome: window.navigator.userAgent.toLowerCase().hasIndexOf('chrome'),
 
-        is_firefox: navigator.userAgent.toLowerCase().hasIndexOf('firefox'),
+        is_firefox: window.navigator.userAgent.toLowerCase().hasIndexOf('firefox'),
+
+        is_opera: utility.hasContent(window.opera),
+
+        is_safari: navigator.vendor.toLowerCase().hasIndexOf('safari'),
 
         localStorage: false,
 
@@ -4983,6 +4987,8 @@
     utility['version'] = utility.version;
     utility['is_chrome'] = utility.is_chrome;
     utility['is_firefox'] = utility.is_firefox;
+    utility['is_opera'] = utility.is_opera;
+    utility['is_safari'] = utility.is_safari;
     utility['localStorage'] = utility.localStorage;
     utility['sessionStorage'] = utility.sessionStorage;
     utility['inputtypes'] = utility.inputtypes;
