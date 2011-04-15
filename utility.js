@@ -61,12 +61,40 @@
         return this.replace(/[\t\r\n]/g, '');
     };
 
-    String.prototype['escapeHTML'] = String.prototype.escapeHTML = function () {
-        return this.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+    String.prototype['escapeHTML'] = String.prototype.escapeHTML = function (method) {
+        method = method === true ? true : false;
+        var str = '',
+            div;
+
+        if (method) {
+            // This method uses standard Javascript replace method
+            str = this.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+        } else {
+            // This method uses the browsers own HTML rendering engine
+            div = document.createElement('div');
+            div.textContent = this;
+            str = div.innerHTML;
+        }
+
+        return str;
     };
 
-    String.prototype['unescapeHTML'] = String.prototype.unescapeHTML = function () {
-        return this.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'");
+    String.prototype['unescapeHTML'] = String.prototype.unescapeHTML = function (method) {
+        method = method === true ? true : false;
+        var str = '',
+            div;
+
+        if (method) {
+            // This method uses standard Javascript replace method
+            str = this.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'");
+        } else {
+            // This method uses the browsers own HTML rendering engine
+            div = document.createElement('div');
+            div.innerHTML = this;
+            str = div.textContent;
+        }
+
+        return str;
     };
 
     // outerTrim recognises more Unicode whitespaces than native trim implimentations
@@ -2975,7 +3003,7 @@
 
         is_firefox: window.navigator.userAgent.toLowerCase().hasIndexOf('firefox'),
 
-        is_opera: utility.hasContent(window.opera),
+        is_opera: window['opera'] ? true : false,
 
         is_safari: navigator.vendor.toLowerCase().hasIndexOf('safari'),
 
@@ -5048,5 +5076,28 @@
     if (!window['utility']) {
         window['utility'] = window.utility = window['$u'] = window.$u = utility;
     }
+/*
+    onmessage = function (event) {
+        try {
+            utility.log(1, "event", event);
+            if (!utility.isString(event.data)) {
+                return;
+            }
+
+            var message = JSON.parse(event.data),
+                compressor,
+                cStr;
+
+            if (message.action === "compress") {
+                compressor = new utility.LZ77();
+                cStr = "LZ77 " + compressor.compress(message.data);
+                utility.log(1, "COMPRESSED");
+                postMessage(JSON.stringify({"action": "done", "data": cStr}));
+            }
+        } catch (err) {
+            utility.error("ERROR in onmessage: " + err);
+        }
+    };
+*/
     /*jslint sub: false */
 }(window));
