@@ -1,6 +1,6 @@
 
-/*jslint white: true, browser: true, devel: true, undef: true, nomen: true, bitwise: true, plusplus: true, immed: true, regexp: true, eqeqeq: true, newcap: true, strict: true, onevar: true, maxerr: 50, maxlen: 280, indent: 4 */
-/*global window,GM_getValue,GM_setValue,GM_deleteValue,GM_listValues,localStorage,sessionStorage,rison */
+/*jslint white: true, browser: true, devel: true, undef: true, nomen: true, bitwise: true, plusplus: true, immed: true, regexp: true, eqeqeq: true, newcap: true, onevar: true, maxerr: 50, maxlen: 280, indent: 4 */
+/*global window,jQuery,GM_getValue,GM_setValue,GM_deleteValue,GM_listValues,localStorage,sessionStorage,rison */
 /*jslint maxlen: 310 */
 
 ////////////////////////////////////////////////////////////////////
@@ -8,9 +8,7 @@
 // Small functions called a lot to reduce duplicate code
 /////////////////////////////////////////////////////////////////////
 
-(function (window) {
-    "use strict";
-
+(function () {
     var log_version = '',
         log_level = 1,
         JSON2 = {},
@@ -3003,9 +3001,10 @@
 
         is_firefox: window.navigator.userAgent.toLowerCase().hasIndexOf('firefox'),
 
+        /* This section is formatted to allow Advanced Optimisation by the Closure Compiler */
+        /*jslint sub: true */
         is_opera: window['opera'] ? true : false,
-
-        is_safari: navigator.vendor.toLowerCase().hasIndexOf('safari'),
+        /*jslint sub: false */
 
         localStorage: false,
 
@@ -5076,28 +5075,5 @@
     if (!window['utility']) {
         window['utility'] = window.utility = window['$u'] = window.$u = utility;
     }
-/*
-    onmessage = function (event) {
-        try {
-            utility.log(1, "event", event);
-            if (!utility.isString(event.data)) {
-                return;
-            }
-
-            var message = JSON.parse(event.data),
-                compressor,
-                cStr;
-
-            if (message.action === "compress") {
-                compressor = new utility.LZ77();
-                cStr = "LZ77 " + compressor.compress(message.data);
-                utility.log(1, "COMPRESSED");
-                postMessage(JSON.stringify({"action": "done", "data": cStr}));
-            }
-        } catch (err) {
-            utility.error("ERROR in onmessage: " + err);
-        }
-    };
-*/
     /*jslint sub: false */
-}(window));
+}());
