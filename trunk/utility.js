@@ -3579,7 +3579,7 @@
     ConfigHelper['base'] = VarsHelper.prototype;
 
     ConfigHelper.prototype['load'] = function () {
-        ConfigHelper['base']['setAll'].call(this, this['storage']['getItem'](this['id']));
+        ConfigHelper['base']['setAll'].call(this, this['storage']['getItem'](this['id'], {}));
         if (!isPlainObject(ConfigHelper['base']['getAll'].call(this)) || isEmptyObject(ConfigHelper['base']['getAll'].call(this))) {
             ConfigHelper['base']['deleteAll'].call(this);
         }
