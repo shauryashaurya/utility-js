@@ -3423,7 +3423,7 @@
 
         this['vars'] = obj;
         this['length'] = length(this['vars']);
-        return this['vars'];
+        return this;
     };
 
     VarsHelper.prototype['getAll'] = function () {
@@ -3433,6 +3433,7 @@
     VarsHelper.prototype['deleteAll'] = function () {
         this['vars'] = {};
         this['length'] = 0;
+        return this;
     };
 
     VarsHelper.prototype['setItem'] = function (name, value) {
@@ -3478,6 +3479,7 @@
 
         delete this['vars'][name];
         this['length'] = length(this['vars']);
+        return this;
     };
 
     VarsHelper.prototype['incItem'] = function (name, step, value) {
@@ -3545,6 +3547,174 @@
         }
     };
 
+    ///////////////////////////
+    //       Function
+    ///////////////////////////
+
+    if (!('swiss' in Function.prototype)) {
+        Function.prototype['swiss'] = function (parent) {
+            var l = ui32(arguments.length),
+                i = 1,
+                n;
+
+            for (i = 1; i < l; i += 1) {
+                n = arguments[i];
+                this.prototype[n] = parent.prototype[n];
+            }
+
+            return this;
+        };
+    }
+
+    //////////////////////////////////////////////////////
+    //                   Schedule Vars Helper
+    // Getters and setters for dealing with schedule variables
+    //////////////////////////////////////////////////////
+
+    function ScheduleVarsHelper() {
+        if (arguments[0] === inheriting) {
+            return;
+        }
+
+        VarsHelper.call(this);
+    }
+
+    //ScheduleVarsHelper.prototype = new VarsHelper(inheriting);
+    ScheduleVarsHelper['swiss'](VarsHelper, 'setAll', 'getAll', 'deleteAll', 'setItem', 'getItem', 'deleteItem', 'copyItem', 'copyAll');
+
+    ScheduleVarsHelper['base'] = VarsHelper.prototype;
+
+    ScheduleVarsHelper.prototype['_setItem'] = ScheduleVarsHelper['base']['setItem'];
+
+    ScheduleVarsHelper.prototype['setItem'] = function (name, seconds, randomSecs) {
+        if (!isNumber(seconds) || seconds < 0) {
+            throwError("ScheduleVarsHelper.setItem", new TypeError(seconds + " is an invalid number"));
+        }
+
+        var now = Date.now();
+        return ScheduleVarsHelper['base']['setItem'].call(this, name, {
+                'last': now,
+                'next': now + (seconds * 1000) + (Math.floor(Math.random() * (!isNumber(randomSecs) || randomSecs < 0 ? 0 : randomSecs)) * 1000)
+            });
+    };
+
+    ScheduleVarsHelper.prototype['check'] = function (name) {
+        var item = ScheduleVarsHelper['base']['getItem'].call(this, name);
+        return isPlainObject(item) ? item['next'] < Date.now() : true;
+    };
+
+    ScheduleVarsHelper.prototype['since'] = function (name_or_number, seconds) {
+        var item,
+            value;
+
+        if (isNaN2(name_or_number)) {
+            item = ScheduleVarsHelper['base']['getItem'].call(this, name_or_number);
+            value = isPlainObject(item) ? item['last'] : 0;
+        } else {
+            value = name_or_number;
+        }
+
+        return value < (Date.now() - 1000 * seconds);
+    };
+
+    //////////////////////////////////////////////////////
+    //                   Schedule Storage Helper
+    // Getters and setters for dealing with schedule storage
+    //////////////////////////////////////////////////////
+
+    function ScheduleStorageHelper(id, key, options) {
+        if (arguments[0] === inheriting) {
+            return;
+        }
+
+        if (!isString(id) || !hasContent(id)) {
+            throwError("ScheduleStorageHelper", new TypeError(id + " is an invalid identifier"));
+        }
+
+        if (!isString(key) || !hasContent(key)) {
+            throwError("ScheduleStorageHelper", new TypeError(key + " is an invalid key"));
+        }
+
+        if (!isPlainObject(options)) {
+            throwError("ScheduleStorageHelper", new TypeError(options + " is an invalid option type"));
+        }
+
+        ScheduleVarsHelper.call(this);
+        this['id'] = id;
+        this['key'] = key;
+        this['storage'] = new StorageHelper(options);
+        this['load']();
+    }
+
+    ScheduleStorageHelper.prototype = new ScheduleVarsHelper(inheriting);
+
+    ScheduleStorageHelper['base'] = ScheduleVarsHelper.prototype;
+
+    ScheduleStorageHelper.prototype['load'] = function () {
+        ScheduleStorageHelper['base']['setAll'].call(this, this['storage']['getItem'](this['id'], {}));
+        if (!isPlainObject(ScheduleStorageHelper['base']['getAll'].call(this)) || isEmptyObject(ScheduleStorageHelper['base']['getAll'].call(this))) {
+            ScheduleStorageHelper['base']['deleteAll'].call(this);
+        }
+
+        if (!hasContent(ScheduleStorageHelper['base']['getItem'].call(this, "key"))) {
+            ScheduleStorageHelper['base']['_setItem'].call(this, "key", this['key']);
+            this['save']();
+        }
+
+        return this;
+    };
+
+    ScheduleStorageHelper.prototype['save'] = function () {
+        this['storage']['setItem'](this['id'], ScheduleStorageHelper['base']['getAll'].call(this));
+        return this;
+    };
+
+    ScheduleStorageHelper.prototype['erase'] = function () {
+        ScheduleStorageHelper['base']['deleteAll'].call(this);
+        ScheduleStorageHelper['base']['setItem'].call(this, "key", this['key']);
+        this['save']();
+        return this;
+    };
+
+    ScheduleStorageHelper.prototype['setAll'] = function (obj) {
+        ScheduleStorageHelper['base']['setAll'].call(this, obj);
+        this['save']();
+        return this;
+    };
+
+    ScheduleStorageHelper.prototype['setItem'] = function (name, seconds, randomSecs) {
+        if (name === this['key']) {
+            throwError("ScheduleStorageHelper.setItem", new TypeError(name + " is a reserved identifier"));
+        }
+
+        var schedule = ScheduleStorageHelper['base']['setItem'].call(this, name, seconds, randomSecs);
+        this['save']();
+        return schedule;
+    };
+
+    ScheduleStorageHelper.prototype['setKey'] = function (value) {
+        if (!isDefined(value)) {
+            throwError("ScheduleStorageHelper.setKey", new TypeError(value + " is 'undefined' or 'null'"));
+        }
+
+        if (!compare(ScheduleStorageHelper['base']['getItem'].call(this, "key"), value)) {
+            ScheduleStorageHelper['base']['_setItem'].call(this, "key", value);
+            this['save']();
+        }
+
+        return this;
+    };
+
+    ScheduleStorageHelper.prototype['getKey'] = function () {
+        return ScheduleStorageHelper['base']['getItem'].call(this, "key");
+    };
+
+    ScheduleStorageHelper.prototype['deleteItem'] = function (name) {
+        ScheduleStorageHelper['base']['deleteItem'].call(this, name);
+        this['save']();
+        return this;
+    };
+
     //////////////////////////////////////////////////////
     //                   Local Storage Config Helper
     // Getters and setters for dealing with configuration options
@@ -3588,21 +3758,26 @@
             ConfigHelper['base']['setItem'].call(this, "key", this['key']);
             this['save']();
         }
+
+        return this;
     };
 
     ConfigHelper.prototype['save'] = function () {
         this['storage']['setItem'](this['id'], ConfigHelper['base']['getAll'].call(this));
+        return this;
     };
 
     ConfigHelper.prototype['erase'] = function () {
         ConfigHelper['base']['deleteAll'].call(this);
         ConfigHelper['base']['setItem'].call(this, "key", this['key']);
         this['save']();
+        return this;
     };
 
     ConfigHelper.prototype['setAll'] = function (obj) {
         ConfigHelper['base']['setAll'].call(this, obj);
         this['save']();
+        return this;
     };
 
     ConfigHelper.prototype['setItem'] = function (name, value) {
@@ -3627,17 +3802,22 @@
             throwError("ConfigHelper.setKey", new TypeError(value + " is 'undefined' or 'null'"));
         }
 
-        if (!compare(ConfigHelper['base']['getItem'].call(this, "key"), value)) {
+        if (!compare(this['getKey'](), value)) {
             ConfigHelper['base']['setItem'].call(this, "key", value);
             this['save']();
         }
 
-        return value;
+        return this;
+    };
+
+    ConfigHelper.prototype['getKey'] = function () {
+        return ConfigHelper['base']['getItem'].call(this, "key");
     };
 
     ConfigHelper.prototype['deleteItem'] = function (name) {
         ConfigHelper['base']['deleteItem'].call(this, name);
         this['save']();
+        return this;
     };
 
     ConfigHelper.prototype['incItem'] = function (name, step, value) {
@@ -3705,25 +3885,6 @@
     ///////////////////////////
     //       Prototypes
     ///////////////////////////
-
-    ///////////////////////////
-    //       Function
-    ///////////////////////////
-
-    if (!('swiss' in Function.prototype)) {
-        Function.prototype['swiss'] = function (parent) {
-            var l = ui32(arguments.length),
-                i = 1,
-                n;
-
-            for (i = 1; i < l; i += 1) {
-                n = arguments[i];
-                this.prototype[n] = parent.prototype[n];
-            }
-
-            return this;
-        };
-    }
 
     ///////////////////////////
     //       String
@@ -7118,6 +7279,16 @@
      * @type {Function}
      */
     utility['StorageHelper'] = StorageHelper;
+
+    /**
+     * @type {Function}
+     */
+    utility['ScheduleVarsHelper'] = ScheduleVarsHelper;
+
+    /**
+     * @type {Function}
+     */
+    utility['ScheduleStorageHelper'] = ScheduleStorageHelper;
 
     /**
      * @type {Function}
