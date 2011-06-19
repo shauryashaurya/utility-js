@@ -1312,8 +1312,8 @@
          * @return {*}
          */
         function isNode(source) {
-            if (window.Node) {
-                return source instanceof window.Node;
+            if (window['Node']) {
+                return source instanceof window['Node'];
             } else {
                 // the document is a special Node and doesn't have many of
                 // the common properties so we use an identity check instead.
@@ -1321,7 +1321,7 @@
                     return true;
                 }
 
-                return isNumber(source.nodeType) && source.attributes && source.childNodes && source.cloneNode;
+                return isNumber(source['nodeType']) && source['attributes'] && source['childNodes'] && source['cloneNode'];
             }
         }
 
@@ -1347,7 +1347,7 @@
 
                 // start with a shallow copy.  We'll handle the deep copy of
                 // its children ourselves.
-                return source.cloneNode(false);
+                return source['cloneNode'](false);
             },
 
             /**
@@ -1363,13 +1363,13 @@
                 }
 
                 var i = 0,
-                    l = source.childNodes ? ui32(source.childNodes.length) : 0,
+                    l = source['childNodes'] ? ui32(source['childNodes']['length']) : 0,
                     childCopy;
 
                 // if this Node has children, deep copy them one-by-one.
                 for (i = 0; i < l; i += 1) {
-                    childCopy = deepCopy(source.childNodes[i]);
-                    result.appendChild(childCopy);
+                    childCopy = deepCopy(source['childNodes'][i]);
+                    result['appendChild'](childCopy);
                 }
 
                 return undefined;
@@ -7041,6 +7041,11 @@
         window['RISON'] = RISON;
     }
 
+    is_chrome = 'chrome' in window && window.navigator.userAgent.toLowerCase()['hasIndexOf']('chrome');
+    is_firefox = window.navigator.userAgent.toLowerCase()['hasIndexOf']('firefox');
+    is_opera = 'opera' in window;
+    internal = new LogHelper({'log_version': uversion, 'log_level': 1});
+
     ///////////////////////////
     //       utility
     ///////////////////////////
@@ -7330,9 +7335,5 @@
      */
     utility['Aes'] = Aes;
 
-    is_chrome = window.navigator.userAgent.toLowerCase()['hasIndexOf']('chrome');
-    is_firefox = window.navigator.userAgent.toLowerCase()['hasIndexOf']('firefox');
-    is_opera = window['opera'] ? true : false;
-    internal = new LogHelper({'log_version': uversion, 'log_level': 1});
     window['utility'] = window['$u'] = utility;
 }());
