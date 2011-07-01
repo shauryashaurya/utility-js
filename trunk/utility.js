@@ -77,7 +77,24 @@
         inheriting = {},
         isArray,
         storageTypes = {},
-        inputTypes = {};
+        inputTypes = {},
+        mutationTypes = {};
+
+    ///////////////////////////
+    //       Object
+    ///////////////////////////
+
+    if (!('create' in Object)) {
+        Object['create'] = (function () {
+            // created only once
+            function F() {}
+            return function (o) {
+                // reused on each invocation
+                F.prototype = o;
+                return new F();
+            };
+        }());
+    }
 
     //////////////////////////////////////////////////////
     //                   noConflict
@@ -111,6 +128,25 @@
     function ui32(n) {
         n = isFinite(n) ? Math.floor(n) : 0;
         return n >= 0 ? n : 0;
+    }
+
+    ///////////////////////////
+    //       Function
+    ///////////////////////////
+
+    if (!('swiss' in Function.prototype)) {
+        Function.prototype['swiss'] = function (parent) {
+            var l = ui32(arguments.length),
+                i = 1,
+                n;
+
+            for (i = 1; i < l; i += 1) {
+                n = arguments[i];
+                this.prototype[n] = parent.prototype[n];
+            }
+
+            return this;
+        };
     }
 
     /**
@@ -557,6 +593,100 @@
 
     }
 
+    function addEvent(obj, type, fn) {
+        canCall(fn);
+        if (obj.attachEvent) {
+            obj['e' + type + fn] = fn;
+            obj[type + fn] = function () {
+                obj['e' + type + fn](window.event);
+            };
+
+            obj.attachEvent('on' + type, obj[type + fn]);
+        } else {
+            obj.addEventListener(type, fn, false);
+        }
+    }
+
+    function removeEvent(obj, type, fn) {
+        canCall(fn);
+        if (obj.detachEvent) {
+            obj.detachEvent('on' + type, obj[type + fn]);
+            obj[type + fn] = null;
+        } else {
+            obj.removeEventListener(type, fn, false);
+        }
+    }
+
+    //////////////////////////////////////////////////////
+    //                   mutationTypes
+    // Discover which Mutation Event types are available
+    //////////////////////////////////////////////////////
+
+    (function (events) {
+        var f = document.createElement('div'),
+            c = f['cloneNode'](true),
+            n = document.createTextNode("text"),
+            e,
+            d,
+            t;
+
+        function passed(event) {
+            mutationTypes[event.type] = true;
+        }
+
+        f['id'] = "MET";
+        f['style']['display'] = "none";
+        document.body.appendChild(f);
+        d = document.getElementById(f['id']);
+
+        e = 'DOMNodeInsertedIntoDocument';
+        mutationTypes[e] = false;
+        addEvent(n, e, passed);
+        d.appendChild(n);
+        removeEvent(n, e, passed);
+        n = null;
+
+        e = 'DOMCharacterDataModified';
+        mutationTypes[e] = false;
+        t = d['firstChild'];
+        addEvent(t, e, passed);
+        t.deleteData(0, 2);
+        removeEvent(t, e, passed);
+        t = null;
+
+        e = 'DOMSubtreeModified';
+        mutationTypes[e] = false;
+        addEvent(d, e, passed);
+        d.innerHTML = "DSM";
+        removeEvent(d, e, passed);
+
+        e = 'DOMNodeInserted';
+        mutationTypes[e] = false;
+        addEvent(d, e, passed);
+        d.appendChild(c);
+        removeEvent(d, e, passed);
+
+        e = 'DOMNodeRemoved';
+        mutationTypes[e] = false;
+        addEvent(d, e, passed);
+        d.removeChild(c);
+        removeEvent(d, e, passed);
+        c = null;
+
+        e = 'DOMAttrModified';
+        mutationTypes[e] = false;
+        addEvent(d, e, passed);
+        d['id'] = "DAM";
+        removeEvent(d, e, passed);
+
+        e = 'DOMNodeRemovedFromDocument';
+        mutationTypes[e] = false;
+        addEvent(d, e, passed);
+        document.body.removeChild(d);
+        removeEvent(d, e, passed);
+        d = null;
+    }());
+
     function plural(i) {
         return i === 1 || i === -1 ? '' : 's';
     }
@@ -841,7 +971,7 @@
          * @return {*}
          */
         function clone(target) {
-            return isObject(target) ? Object.create(target) : target;
+            return isObject(target) ? Object['create'](target) : target;
         }
 
         /**
@@ -3547,25 +3677,6 @@
         }
     };
 
-    ///////////////////////////
-    //       Function
-    ///////////////////////////
-
-    if (!('swiss' in Function.prototype)) {
-        Function.prototype['swiss'] = function (parent) {
-            var l = ui32(arguments.length),
-                i = 1,
-                n;
-
-            for (i = 1; i < l; i += 1) {
-                n = arguments[i];
-                this.prototype[n] = parent.prototype[n];
-            }
-
-            return this;
-        };
-    }
-
     //////////////////////////////////////////////////////
     //                   Schedule Vars Helper
     // Getters and setters for dealing with schedule variables
@@ -3622,7 +3733,7 @@
     // Getters and setters for dealing with schedule storage
     //////////////////////////////////////////////////////
 
-    function ScheduleStorageHelper(id, key, options) {
+    function ScheduleStorageHelper(id, key, options, keyName) {
         if (arguments[0] === inheriting) {
             return;
         }
@@ -3641,7 +3752,9 @@
 
         ScheduleVarsHelper.call(this);
         this['id'] = id;
-        this['key'] = key;
+        keyName = hasContent(keyName) && isString(keyName) ? keyName : "key";
+        this['keyName'] = keyName;
+        this[keyName] = key;
         this['storage'] = new StorageHelper(options);
         this['load']();
     }
@@ -3656,8 +3769,8 @@
             ScheduleStorageHelper['base']['deleteAll'].call(this);
         }
 
-        if (!hasContent(ScheduleStorageHelper['base']['getItem'].call(this, "key"))) {
-            ScheduleStorageHelper['base']['_setItem'].call(this, "key", this['key']);
+        if (!hasContent(ScheduleStorageHelper['base']['getItem'].call(this, this['keyName']))) {
+            ScheduleStorageHelper['base']['_setItem'].call(this, this['keyName'], this[this['keyName']]);
             this['save']();
         }
 
@@ -3671,7 +3784,7 @@
 
     ScheduleStorageHelper.prototype['erase'] = function () {
         ScheduleStorageHelper['base']['deleteAll'].call(this);
-        ScheduleStorageHelper['base']['setItem'].call(this, "key", this['key']);
+        ScheduleStorageHelper['base']['setItem'].call(this, this['keyName'], this[this['keyName']]);
         this['save']();
         return this;
     };
@@ -3683,7 +3796,7 @@
     };
 
     ScheduleStorageHelper.prototype['setItem'] = function (name, seconds, randomSecs) {
-        if (name === this['key']) {
+        if (name === this['keyName']) {
             throwError("ScheduleStorageHelper.setItem", new TypeError(name + " is a reserved identifier"));
         }
 
@@ -3697,8 +3810,8 @@
             throwError("ScheduleStorageHelper.setKey", new TypeError(value + " is 'undefined' or 'null'"));
         }
 
-        if (!compare(ScheduleStorageHelper['base']['getItem'].call(this, "key"), value)) {
-            ScheduleStorageHelper['base']['_setItem'].call(this, "key", value);
+        if (!compare(ScheduleStorageHelper['base']['getItem'].call(this, this['keyName']), value)) {
+            ScheduleStorageHelper['base']['_setItem'].call(this, this['keyName'], value);
             this['save']();
         }
 
@@ -3706,7 +3819,7 @@
     };
 
     ScheduleStorageHelper.prototype['getKey'] = function () {
-        return ScheduleStorageHelper['base']['getItem'].call(this, "key");
+        return ScheduleStorageHelper['base']['getItem'].call(this, this['keyName']);
     };
 
     ScheduleStorageHelper.prototype['deleteItem'] = function (name) {
@@ -3720,7 +3833,7 @@
     // Getters and setters for dealing with configuration options
     //////////////////////////////////////////////////////
 
-    function ConfigHelper(id, key, options) {
+    function ConfigHelper(id, key, options, keyName) {
         if (arguments[0] === inheriting) {
             return;
         }
@@ -3739,7 +3852,9 @@
 
         VarsHelper.call(this);
         this['id'] = id;
-        this['key'] = key;
+        keyName = hasContent(keyName) && isString(keyName) ? keyName : "key";
+        this['keyName'] = keyName;
+        this[keyName] = key;
         this['storage'] = new StorageHelper(options);
         this['load']();
     }
@@ -3754,8 +3869,8 @@
             ConfigHelper['base']['deleteAll'].call(this);
         }
 
-        if (!hasContent(ConfigHelper['base']['getItem'].call(this, "key"))) {
-            ConfigHelper['base']['setItem'].call(this, "key", this['key']);
+        if (!hasContent(ConfigHelper['base']['getItem'].call(this, this['keyName']))) {
+            ConfigHelper['base']['setItem'].call(this, this['keyName'], this[this['keyName']]);
             this['save']();
         }
 
@@ -3769,7 +3884,7 @@
 
     ConfigHelper.prototype['erase'] = function () {
         ConfigHelper['base']['deleteAll'].call(this);
-        ConfigHelper['base']['setItem'].call(this, "key", this['key']);
+        ConfigHelper['base']['setItem'].call(this, this['keyName'], this[this['keyName']]);
         this['save']();
         return this;
     };
@@ -3781,7 +3896,7 @@
     };
 
     ConfigHelper.prototype['setItem'] = function (name, value) {
-        if (name === this['key']) {
+        if (name === this['keyName']) {
             throwError("ConfigHelper.setItem", new TypeError(name + " is a reserved identifier"));
         }
 
@@ -3803,7 +3918,7 @@
         }
 
         if (!compare(this['getKey'](), value)) {
-            ConfigHelper['base']['setItem'].call(this, "key", value);
+            ConfigHelper['base']['setItem'].call(this, this['keyName'], value);
             this['save']();
         }
 
@@ -3811,7 +3926,7 @@
     };
 
     ConfigHelper.prototype['getKey'] = function () {
-        return ConfigHelper['base']['getItem'].call(this, "key");
+        return ConfigHelper['base']['getItem'].call(this, this['keyName']);
     };
 
     ConfigHelper.prototype['deleteItem'] = function (name) {
@@ -5244,18 +5359,6 @@
     //       Object
     ///////////////////////////
 
-    if (!('create' in Object)) {
-        Object.create = (function () {
-            // created only once
-            function F() {}
-            return function (o) {
-                // reused on each invocation
-                F.prototype = o;
-                return new F();
-            };
-        }());
-    }
-
     ///////////////////////////
     //       Array
     ///////////////////////////
@@ -5564,11 +5667,47 @@
         };
     }
 
-    if (!('deleteElement' in Array.prototype)) {
-        Array.prototype['deleteElement'] = function (v) {
-            while (v in this) {
-                this.splice(this.indexOf(v), 1);
+    if (!('remove' in Array.prototype)) {
+        Array.prototype.remove = function (from, to) {
+            var rest = this.slice((to || from) + 1 || this.length);
+            this.length = from < 0 ? this.length + from : from;
+            return this.push.apply(this, rest);
+        };
+    }
+
+    if (!('removeByValue' in Array.prototype)) {
+        Array.prototype['removeByValue'] = function (v) {
+            if (this.hasIndexOf(v)) {
+                for (var i = ui32(this.length) - 1; i >= 0 ; i -= 1) {
+                    if (this[i] === v) {
+                        this.splice(i, 1);
+                    }
+                }
             }
+
+            return this;
+        };
+    }
+
+    if (!('removeFirstValue' in Array.prototype)) {
+        Array.prototype['removeFirstValue'] = function (v) {
+            var i = this.indexOf(v);
+            if (i >= 0) {
+                this.splice(i, 1);
+            }
+
+            return this;
+        };
+    }
+
+    if (!('removeLastValue' in Array.prototype)) {
+        Array.prototype['removeLastValue'] = function (v) {
+            var i = this.lastIndexOf(v);
+            if (i >= 0) {
+                this.splice(i, 1);
+            }
+
+            return this;
         };
     }
 
@@ -7223,6 +7362,16 @@
     /**
      * @type {Function}
      */
+    utility['addEvent'] = addEvent;
+
+    /**
+     * @type {Function}
+     */
+    utility['removeEvent'] = removeEvent;
+
+    /**
+     * @type {Function}
+     */
     utility['cutSharp'] = cutSharp;
 
     /**
@@ -7319,6 +7468,11 @@
      * @type {Object}
      */
     utility['inheriting'] = inheriting;
+
+    /**
+     * @type {Object.<string, boolean>}
+     */
+    utility['mutationTypes'] = mutationTypes;
 
     /**
      * @type {Object.<string, boolean>}
