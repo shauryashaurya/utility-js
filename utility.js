@@ -388,7 +388,7 @@
      * @return {number}
      * @private
      */
-    function length(obj) {
+    function lengthOf(obj) {
         if (isArray(obj)) {
             return ui32(obj.length);
         } else if (isPlainObject(obj)) {
@@ -423,7 +423,7 @@
 
         switch (typeOf(left)) {
         case "object":
-            if (length(left) !== length(right)) {
+            if (lengthOf(left) !== lengthOf(right)) {
                 return false;
             }
 
@@ -691,10 +691,17 @@
         return i === 1 || i === -1 ? '' : 's';
     }
 
-    function injectScript(url, inBody) {
+    function injectScript(data, isText, inBody) {
+        isText = isText || false;
+        inBody = inBody || false;
         var inject = document.createElement('script');
         inject.setAttribute('type', 'text/javascript');
-        inject.setAttribute('src', url);
+        if (isText) {
+            inject.textContent = data;
+        } else {
+            inject.setAttribute('src', data);
+        }
+
         return inBody ? document.body.appendChild(inject) : (document.head || document.getElementsByTagName('head')[0] || document.documentElement).appendChild(inject);
     }
 
@@ -852,6 +859,10 @@
      * @param {*} options For setting conversion options, only one presently if object 'rgb': 'string'
      */
     function ColorConv(options) {
+        if (arguments[0] === inheriting) {
+            return;
+        }
+
         this['h'] = '#000000';
         this['d'] = 0;
         this['r'] = {'r': 0, 'g': 0, 'b': 0};
@@ -1949,8 +1960,8 @@
         }
 
         settings = isPlainObject(settings) && hasContent(settings) ? settings : {};
-        this['log_version'] = settings['log_version'] || "";
-        this['log_level'] = settings['log_version'] || 1;
+        this['log_version'] = setContent(settings['log_version'], "");
+        this['log_level'] = setContent(settings['log_version'], 1);
     }
 
     LogHelper.prototype['log_common'] = function (type, level, text) {
@@ -2022,50 +2033,68 @@
         }
 
         settings = isPlainObject(settings) && hasContent(settings) ? settings : {};
-        this.referencePrefix       = "`";
-        this.referenceIntBase      = settings['referenceIntBase'] || 96;
-        this.referenceIntFloorCode = " ".charCodeAt(0);
-        this.referenceIntCeilCode  = this.referenceIntFloorCode + this.referenceIntBase - 1;
-        this.maxStringDistance     = Math.pow(this.referenceIntBase, 2) - 1;
-        this.minStringLength       = settings['minStringLength'] || 5;
-        this.maxStringLength       = Math.pow(this.referenceIntBase, 1) - 1 + this.minStringLength;
-        this.defaultWindowLength   = settings['defaultWindowLength'] || 144;
-        this.maxWindowLength       = this.maxStringDistance + this.minStringLength;
+        this['referencePrefix']       = "`";
+        this['referenceIntBase']      = setContent(settings['referenceIntBase'], 96);
+        this['referenceIntFloorCode'] = " ".charCodeAt(0);
+        this['referenceIntCeilCode']  = this['referenceIntFloorCode'] + this['referenceIntBase'] - 1;
+        this['maxStringDistance']     = Math.pow(this['referenceIntBase'], 2) - 1;
+        this['minStringLength']       = setContent(settings['minStringLength'], 5);
+        this['maxStringLength']       = Math.pow(this['referenceIntBase'], 1) - 1 + this['minStringLength'];
+        this['defaultWindowLength']   = setContent(settings['defaultWindowLength'], 144);
+        this['maxWindowLength']       = this['maxStringDistance'] + this['minStringLength'];
     }
 
-    LZ77.prototype['compress'] = function (data, windowLength) {
-        function encodeReferenceInt(value, width) {
-            if ((value >= 0) && (value < (Math.pow(this.referenceIntBase, width) - 1))) {
-                var encoded       = "",
-                    i             = 0,
-                    missingLength = 0,
-                    mf            = Math.floor,
-                    sc            = String.fromCharCode;
+    LZ77.prototype['_encodeReferenceInt'] = function (value, width) {
+        if ((value >= 0) && (value < (Math.pow(this['referenceIntBase'], width) - 1))) {
+            var encoded       = "",
+                i             = 0,
+                missingLength = 0,
+                mf            = Math.floor,
+                sc            = String.fromCharCode;
 
-                while (value > 0) {
-                    encoded = sc((value % this.referenceIntBase) + this.referenceIntFloorCode) + encoded;
-                    value = mf(value / this.referenceIntBase);
-                }
+            while (value > 0) {
+                encoded = sc((value % this['referenceIntBase']) + this['referenceIntFloorCode']) + encoded;
+                value = mf(value / this['referenceIntBase']);
+            }
 
-                missingLength = width - ui32(encoded.length);
-                for (i = 0; i < missingLength; i += 1) {
-                    encoded = sc(this.referenceIntFloorCode) + encoded;
-                }
+            missingLength = width - encoded.length;
+            for (i = 0; i < missingLength; i += 1) {
+                encoded = sc(this['referenceIntFloorCode']) + encoded;
+            }
 
-                return encoded;
+            return encoded;
+        } else {
+            return throwError("LZ77.compress", new Error("Reference int out of range: " + value + " (width = " + width + ")"));
+        }
+    };
+
+    LZ77.prototype['_decodeReferenceInt'] = function (data, width) {
+        var value    = 0,
+            i        = 0,
+            charCode = 0;
+
+        for (i = 0; i < width; i += 1) {
+            value *= this['referenceIntBase'];
+            charCode = data.charCodeAt(i);
+            if ((charCode >= this['referenceIntFloorCode']) && (charCode <= this['referenceIntCeilCode'])) {
+                value += charCode - this['referenceIntFloorCode'];
             } else {
-                return throwError("LZ77.compress", new Error("Reference int out of range: " + value + " (width = " + width + ")"));
+                return throwError("LZ77.compress", new Error("Invalid char code in reference int: " + charCode));
             }
         }
 
-        windowLength = windowLength || this.defaultWindowLength;
-        if (windowLength > this.maxWindowLength) {
+        return value;
+    };
+
+    LZ77.prototype['compress'] = function (data, windowLength) {
+        windowLength = windowLength || this['defaultWindowLength'];
+        if (windowLength > this['maxWindowLength']) {
             return throwError("LZ77.compress", new Error("Window length too large"));
         }
 
         var compressed      = "",
             pos             = 0,
-            lastPos         = ui32(data.length) - this.minStringLength,
+            lastPos         = data.length - this['minStringLength'],
             searchStart     = 0,
             matchLength     = 0,
             foundMatch      = false,
@@ -2073,21 +2102,20 @@
             newCompressed   = null,
             realMatchLength = 0,
             mm              = Math.max,
-            dataCharAt      = 0,
-            l               = 0;
+            dataCharAt      = 0;
 
         while (pos < lastPos) {
             searchStart = mm(pos - windowLength, 0);
-            matchLength = this.minStringLength;
+            matchLength = this['minStringLength'];
             foundMatch = false;
             bestMatch = {
-                distance : this.maxStringDistance,
+                distance : this['maxStringDistance'],
                 length   : 0
             };
 
             newCompressed = null;
             while ((searchStart + matchLength) < pos) {
-                if ((matchLength < this.maxStringLength) && (data.substr(searchStart, matchLength) === data.substr(pos, matchLength))) {
+                if ((matchLength < this['maxStringLength']) && (data.substr(searchStart, matchLength) === data.substr(pos, matchLength))) {
                     matchLength += 1;
                     foundMatch = true;
                 } else {
@@ -2097,22 +2125,21 @@
                         bestMatch.length = realMatchLength;
                     }
 
-                    matchLength = this.minStringLength;
+                    matchLength = this['minStringLength'];
                     searchStart += 1;
                     foundMatch = false;
                 }
             }
 
-            l = bestMatch.length;
-            if (l) {
-                newCompressed = this.referencePrefix + encodeReferenceInt(bestMatch.distance, 2) + encodeReferenceInt(bestMatch.length - this.minStringLength, 1);
-                pos += l;
+            if (bestMatch.length) {
+                newCompressed = this['referencePrefix'] + this['_encodeReferenceInt'](bestMatch.distance, 2) + this['_encodeReferenceInt'](bestMatch.length - this['minStringLength'], 1);
+                pos += bestMatch.length;
             } else {
                 dataCharAt = data.charAt(pos);
-                if (dataCharAt !== this.referencePrefix) {
+                if (dataCharAt !== this['referencePrefix']) {
                     newCompressed = dataCharAt;
                 } else {
-                    newCompressed = this.referencePrefix + this.referencePrefix;
+                    newCompressed = this['referencePrefix'] + this['referencePrefix'];
                 }
 
                 pos += 1;
@@ -2125,49 +2152,31 @@
     };
 
     LZ77.prototype['decompress'] = function (data) {
-        function decodeReferenceInt(ddat, width) {
-            var value    = 0,
-                i        = 0,
-                charCode = 0;
-
-            for (i = 0; i < width; i += 1) {
-                value *= this.referenceIntBase;
-                charCode = ddat.charCodeAt(i);
-                if ((charCode >= this.referenceIntFloorCode) && (charCode <= this.referenceIntCeilCode)) {
-                    value += charCode - this.referenceIntFloorCode;
-                } else {
-                    return throwError("LZ77.compress", new Error("Invalid char code in reference int: " + charCode));
-                }
-            }
-
-            return value;
-        }
-
         var decompressed = "",
             pos          = 0,
             currentChar  = '',
             nextChar     = '',
             distance     = 0,
             length       = 0,
-            minStrLength = this.minStringLength - 1,
-            dataLength   = ui32(data.length),
+            minStrLength = this['minStringLength'] - 1,
+            dataLength   = data.length,
             posPlusOne   = 0;
 
         while (pos < dataLength) {
             currentChar = data.charAt(pos);
-            if (currentChar !== this.referencePrefix) {
+            if (currentChar !== this['referencePrefix']) {
                 decompressed += currentChar;
                 pos += 1;
             } else {
                 posPlusOne = pos + 1;
                 nextChar = data.charAt(posPlusOne);
-                if (nextChar !== this.referencePrefix) {
-                    distance = decodeReferenceInt(data.substr(posPlusOne, 2), 2);
-                    length = decodeReferenceInt(data.charAt(pos + 3), 1) + this.minStringLength;
-                    decompressed += decompressed.substr(ui32(decompressed.length) - distance - length, length);
+                if (nextChar !== this['referencePrefix']) {
+                    distance = this['_decodeReferenceInt'](data.substr(posPlusOne, 2), 2);
+                    length = this['_decodeReferenceInt'](data.charAt(pos + 3), 1) + this['minStringLength'];
+                    decompressed += decompressed.substr(decompressed.length - distance - length, length);
                     pos += minStrLength;
                 } else {
-                    decompressed += this.referencePrefix;
+                    decompressed += this['referencePrefix'];
                     pos += 2;
                 }
             }
@@ -2175,6 +2184,24 @@
 
         return decompressed;
     };
+
+    if (!('LZ77Compress' in String.prototype)) {
+        String.prototype['LZ77Compress'] = (function () {
+            var c = new LZ77();
+            return function () {
+                return c['compress'](this);
+            };
+        }());
+    }
+
+    if (!('LZ77Decompress' in String.prototype)) {
+        String.prototype['LZ77Decompress'] = (function () {
+            var c = new LZ77();
+            return function () {
+                return c['decompress'](this);
+            };
+        }());
+    }
 
     //////////////////////////////////////////////////////
     //                   Storage tests
@@ -2238,7 +2265,7 @@
 
             stringified = (doHpack ? (this['useRison'] ? "R-HPACK " : "HPACK ") : (this['useRison'] ? "RISON " : "")) + stringified;
             if (isBoolean(compress) ? compress : false) {
-                storageStr = "LZ77 " + stringified['LZ77Compress'];
+                storageStr = "LZ77 " + stringified['LZ77Compress']();
                 //internal['log'](1, "Compressed storage", name, ((ui32(storageStr.length) / ui32(stringified.length)) * 100)['dp'](2));
             } else {
                 storageStr = stringified;
@@ -2291,7 +2318,7 @@
 
             if (isString(storageStr)) {
                 if (storageStr.match(/^LZ77 /)) {
-                    storageStr = storageStr.slice(5)['LZ77Decompress'];
+                    storageStr = storageStr.slice(5)['LZ77Decompress']();
                     //internal['log'](1, "Decompressed storage", name);
                 }
 
@@ -3552,7 +3579,7 @@
         }
 
         this['vars'] = obj;
-        this['length'] = length(this['vars']);
+        this['length'] = lengthOf(this['vars']);
         return this;
     };
 
@@ -3572,7 +3599,7 @@
         }
 
         this['vars'][name] = value;
-        this['length'] = length(this['vars']);
+        this['length'] = lengthOf(this['vars']);
         return this['vars'][name];
     };
 
@@ -3608,7 +3635,7 @@
         }
 
         delete this['vars'][name];
-        this['length'] = length(this['vars']);
+        this['length'] = lengthOf(this['vars']);
         return this;
     };
 
@@ -4480,27 +4507,15 @@
         };
     }
 
-    if (!('LZ77Compress' in String.prototype)) {
-        String.prototype['LZ77Compress'] = function () {
-            return new LZ77()['compress'](this);
-        };
-    }
-
-    if (!('LZ77Decompress' in String.prototype)) {
-        String.prototype['LZ77Decompress'] = function () {
-            return new LZ77()['decompress'](this);
-        };
-    }
-
     if (!('AESEncrypt' in String.prototype)) {
         String.prototype['AESEncrypt'] = function (password, nBits, utf8encode) {
-            return new Aes(password, nBits, utf8encode)['encrypt'](this);
+            return (new Aes(password, nBits, utf8encode))['encrypt'](this);
         };
     }
 
     if (!('AESDecrypt' in String.prototype)) {
         String.prototype['AESDecrypt'] = function (password, nBits, utf8encode) {
-            return new Aes(password, nBits, utf8encode)['decrypt'](this);
+            return (new Aes(password, nBits, utf8encode))['decrypt'](this);
         };
     }
 
@@ -7180,6 +7195,88 @@
         window['RISON'] = RISON;
     }
 
+    ///////////////////////////////////////////////////////////
+    //            Communication Helper
+    // Shared DOM page access communications
+    // Prototype is built with this['function'] so it can be
+    // stringified and injected
+    ///////////////////////////////////////////////////////////
+
+    function CommunicationHelper(id, reciever, fn) {
+        id = id || "communicationDiv";
+        reciever = reciever || false;
+        var nul = JSON.parse("null"),
+            eventName = "communicationEvent",
+            fired,
+            element,
+            customEvent;
+
+        if (reciever && fn && typeof fn !== "function") {
+            /*jslint evil: true */
+            eval("throw new TypeError(" + fn + "' is not a function');");
+            /*jslint evil: false */
+        }
+
+        function addEvt(obj, type, fni) {
+            if (obj.attachEvent) {
+                obj['e' + type + fni] = fni;
+                obj[type + fni] = function () {
+                    obj['e' + type + fni](window.event);
+                };
+
+                obj.attachEvent('on' + type, obj[type + fni]);
+            } else {
+                obj.addEventListener(type, fni, false);
+            }
+        }
+
+        function removeEvt(obj, type, fni) {
+            if (obj.detachEvent) {
+                obj.detachEvent('on' + type, obj[type + fni]);
+                obj[type + fni] = nul;
+            } else {
+                obj.removeEventListener(type, fni, false);
+            }
+        }
+
+        fired = function (event) {
+            if (fn) {
+                fn(JSON.parse(event.target.innerText));
+            }
+        };
+
+        if (reciever) {
+            element = document.createElement('div');
+            element.setAttribute('id', id);
+            element.style.display = "none";
+            document.body.appendChild(element);
+            addEvt(element, eventName, fired);
+        } else {
+            customEvent = document.createEvent("Event");
+            customEvent.initEvent(eventName, true, true);
+            element = document.getElementById(id);
+            this['send'] = function (data) {
+                element.innerText = JSON.stringify(data);
+                element.dispatchEvent(customEvent);
+            };
+        }
+
+        this['destroy'] = function () {
+            if (reciever) {
+                removeEvt(element, eventName, fired);
+            } else {
+                document.body.removeChild(element);
+            }
+
+            element = customEvent = nul;
+            return nul;
+        };
+    }
+
+    ///////////////////////////
+    //   set some variables
+    ///////////////////////////
+
     is_chrome = 'chrome' in window && window.navigator.userAgent.toLowerCase()['hasIndexOf']('chrome');
     is_firefox = window.navigator.userAgent.toLowerCase()['hasIndexOf']('firefox');
     is_opera = 'opera' in window;
@@ -7195,6 +7292,11 @@
     utility['version'] = uversion;
 
     /**
+     * @type {Function}
+     */
+    utility['noConflict'] = noConflict;
+
+    /**
      * @type {boolean}
      */
     utility['is_chrome'] = is_chrome;
@@ -7208,11 +7310,6 @@
      * @type {boolean}
      */
     utility['is_opera'] = is_opera;
-
-    /**
-     * @type {Function}
-     */
-    utility['noConflict'] = noConflict;
 
     /**
      * @type {Function}
@@ -7337,7 +7434,7 @@
     /**
      * @type {Function}
      */
-    utility['length'] = length;
+    utility['lengthOf'] = lengthOf;
 
     /**
      * @type {Function}
@@ -7413,6 +7510,11 @@
      * @type {Function}
      */
     utility['owl'] = owl;
+
+    /**
+     * @type {Function}
+     */
+    utility['CommunicationHelper'] = CommunicationHelper;
 
     /**
      * @type {Function}
