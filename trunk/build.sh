@@ -3,7 +3,7 @@
 # Please copy this file as "build.sh"
 # Edit to put in the correct paths for your system
 
-VER="0.2.2"
+VER="0.2.3"
 echo "Creating release version $VER"
 sed s/!version!/$VER/g head.js > utility-$VER.js
 sed s/!version!/$VER/g utility.js >> utility-$VER.js
